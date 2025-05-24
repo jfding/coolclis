@@ -26,7 +26,7 @@ enum Commands {
 
         /// Tool name (used for the executable name)
         #[arg(short, long)]
-        tool: String,
+        bin: Option<String>,
 
         /// Specific version to install (defaults to latest)
         #[arg(short, long)]
@@ -326,10 +326,11 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
     }
 }
 
-async fn install_tool(repo: &str, tool: &str, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
+async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
+    let tool = bin.unwrap_or(repo.split('/').last().unwrap());
+
     println!("Installing {} from {}", tool, repo);
 
-    
     // Get the release
     let release = match version {
         Some(v) => get_specific_release(repo, v).await?,
@@ -417,8 +418,8 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Install { repo, tool, version, dir } => {
-            install_tool(repo, tool, version.as_deref(), dir.as_ref()).await?;
+        Commands::Install { repo, bin, version, dir } => {
+            install_tool(repo, bin.as_deref(), version.as_deref(), dir.as_ref()).await?;
         }
     }
 
