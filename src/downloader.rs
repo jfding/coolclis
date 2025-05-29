@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use indicatif::{ProgressBar, ProgressStyle};
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::{header::{HeaderMap, HeaderValue, USER_AGENT}, StatusCode};
 use std::time::Duration;
 
 pub struct Downloader {
@@ -40,6 +40,9 @@ impl Downloader {
 
             match self.client.get(url).headers(headers.clone()).send().await {
                 Ok(response) => {
+                    if response.status() == StatusCode::NOT_FOUND {
+                        return Err(anyhow!("{} not found (404)", url));
+                    }
                     if response.status().is_success() {
                         match response.json::<T>().await {
                             Ok(data) => return Ok(data),
