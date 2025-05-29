@@ -9,6 +9,9 @@ use std::path::{Path, PathBuf};
 mod downloader;
 use downloader::Downloader;
 
+mod config;
+use config::{load_cli_tools, list_available_tools};
+
 #[derive(Parser)]
 #[command(name = "coolclis")]
 #[command(about = "A tool to download and install CLI tools from GitHub releases", long_about = None)]
@@ -21,7 +24,7 @@ struct Cli {
 enum Commands {
     /// Install a tool from GitHub
     Install {
-        /// GitHub repository in the format owner/repo
+        /// GitHub repository in the format owner/repo or a predefined tool name
         repo: String,
 
         /// Tool name (used for the executable name)
@@ -36,6 +39,9 @@ enum Commands {
         #[arg(short, long)]
         dir: Option<PathBuf>,
     },
+
+    /// List all available predefined tools
+    List,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -49,6 +55,18 @@ struct Asset {
     name: String,
     browser_download_url: String,
     size: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CliTool {
+    name: String,
+    repo: String,
+    description: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CliToolsConfig {
+    tools: Vec<CliTool>,
 }
 
 async fn get_latest_release(repo: &str) -> Result<Release> {
@@ -92,14 +110,14 @@ fn get_platform_info() -> (String, String) {
 
 fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&'a Asset> {
     let (os, arch) = get_platform_info();
-    
+
     // Variations of OS/arch in filenames
     let os_variations: Vec<&str> = if os == "darwin" {
         vec!["darwin", "macos", "mac", "osx"]
     } else {
         vec![&os]
     };
-    
+
     let arch_variations: Vec<&str> = if arch == "x86_64" {
         vec!["x86_64", "amd64", "x64"]
     } else if arch == "arm64" {
@@ -132,7 +150,7 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
             for asset in &release.assets {
                 let name = asset.name.to_lowercase();
                 let tool_lower = tool_name.to_lowercase();
-                
+
                 if name.contains(&tool_lower) && name.contains(pattern) && name.ends_with(ext) {
                     return Ok(asset);
                 }
@@ -157,18 +175,18 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
 
 fn extract_archive(data: &[u8], filename: &str, dest_dir: &Path) -> Result<Option<PathBuf>> {
     let cursor = Cursor::new(data);
-    
+
     if filename.ends_with(".tar.gz") || filename.ends_with(".tgz") {
         let tar = flate2::read::GzDecoder::new(cursor);
         let mut archive = tar::Archive::new(tar);
         archive.unpack(dest_dir)?;
-        
+
         // Find executable files recursively
         find_executable_recursively(dest_dir)
     } else if filename.ends_with(".zip") {
         let mut archive = zip::ZipArchive::new(cursor)?;
         archive.extract(dest_dir)?;
-        
+
         // Find executable files recursively
         find_executable_recursively(dest_dir)
     } else {
@@ -205,7 +223,7 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
                     }
                 }
             }
-            
+
             // If we didn't find an exact match, return the first file in bin/
             for entry in fs::read_dir(&bin_dir)? {
                 let entry = entry?;
@@ -223,7 +241,7 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
                 }
             }
         }
-        
+
         // Next, try to find a file with the same name as the directory
         let possible_bin = dir.join(dir_name);
         if possible_bin.exists() && possible_bin.is_file() {
@@ -238,25 +256,25 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
             return Ok(Some(possible_bin));
         }
     }
-    
+
     // Check for common executable names and locations
     let mut candidates = Vec::new();
-    
+
     fn search_directory(dir: &Path, candidates: &mut Vec<PathBuf>) -> Result<()> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_file() {
                 let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                
+
                 // Skip files that start with a dot or are LICENSE or README files
-                if !file_name.starts_with('.') && 
-                   !file_name.starts_with("LICENSE") && 
-                   !file_name.starts_with("README") && 
-                   !file_name.contains(".md") && 
+                if !file_name.starts_with('.') &&
+                   !file_name.starts_with("LICENSE") &&
+                   !file_name.starts_with("README") &&
+                   !file_name.contains(".md") &&
                    !file_name.contains(".txt") {
-                    
+
                     // Prioritize files without extensions
                     if !file_name.contains('.') {
                         candidates.push(path.clone());
@@ -287,18 +305,18 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
         }
         Ok(())
     }
-    
+
     search_directory(dir, &mut candidates)?;
-    
+
     // Sort candidates to prioritize likely executables
     candidates.sort_by(|a, b| {
         let a_name = a.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let b_name = b.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        
+
         // Prioritize files without extensions
         let a_has_ext = a_name.contains('.');
         let b_has_ext = b_name.contains('.');
-        
+
         if a_has_ext && !b_has_ext {
             std::cmp::Ordering::Greater
         } else if !a_has_ext && b_has_ext {
@@ -308,7 +326,7 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
             a_name.len().cmp(&b_name.len())
         }
     });
-    
+
     // Take the first candidate
     if let Some(path) = candidates.first() {
         #[cfg(unix)]
@@ -319,7 +337,7 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
             perms.set_mode(0o755);
             fs::set_permissions(path, perms)?;
         }
-        
+
         Ok(Some(path.clone()))
     } else {
         Ok(None)
@@ -336,17 +354,17 @@ async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir:
         Some(v) => get_specific_release(repo, v).await?,
         None => get_latest_release(repo).await?,
     };
-    
+
     println!("Found release: {}", release.tag_name);
-    
+
     // Find the right asset
     let asset = find_appropriate_asset(&release, tool)?;
     println!("Selected asset: {} ({} bytes)", asset.name, asset.size);
-    
+
     // Download the asset
     let downloader = Downloader::default();
     let data = downloader.download_file(&asset.browser_download_url, asset.size).await?;
-    
+
     // Determine install directory
     let install_dir = match dir {
         Some(d) => d.clone(),
@@ -358,21 +376,21 @@ async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir:
             home_dir
         }
     };
-    
+
     // Create a temporary directory for extraction if needed
     let temp_dir = install_dir.join(format!("{}_temp", tool));
     if temp_dir.exists() {
         fs::remove_dir_all(&temp_dir)?;
     }
     fs::create_dir_all(&temp_dir)?;
-    
+
     // Check if the downloaded file is an archive that needs extraction
     let file_path = if asset.name.ends_with(".tar.gz") || asset.name.ends_with(".tgz") || asset.name.ends_with(".zip") {
         println!("Extracting archive...");
-        
+
         // Extract the archive
         let extracted_path = extract_archive(&data, &asset.name, &temp_dir)?;
-        
+
         // Move the extracted binary to the final location
         match extracted_path {
             Some(path) => {
@@ -390,7 +408,7 @@ async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir:
         let file_path = install_dir.join(tool);
         let mut file = File::create(&file_path)?;
         io::copy(&mut Cursor::new(data), &mut file)?;
-        
+
         // Make the file executable on Unix systems
         #[cfg(unix)]
         {
@@ -400,16 +418,16 @@ async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir:
             perms.set_mode(0o755);
             fs::set_permissions(&file_path, perms)?;
         }
-        
+
         file_path
     };
-    
+
     // Clean up the temporary directory
     fs::remove_dir_all(temp_dir)?;
-    
+
     println!("Successfully installed {} to {}", tool, file_path.display());
     println!("Make sure {} is in your PATH", install_dir.display());
-    
+
     Ok(())
 }
 
@@ -419,7 +437,22 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Install { repo, bin, version, dir } => {
-            install_tool(repo, bin.as_deref(), version.as_deref(), dir.as_ref()).await?;
+            // Load the tools map
+            let tools_map = load_cli_tools()?;
+
+            // Check if the repo is a known tool name
+            let actual_repo = if repo.contains('/') {
+                repo.to_string()
+            } else {
+                tools_map.get(repo)
+                    .ok_or_else(|| anyhow!("Unknown tool: {}. Use the 'list' command to see available tools.", repo))?
+                    .to_string()
+            };
+
+            install_tool(&actual_repo, bin.as_deref(), version.as_deref(), dir.as_ref()).await?;
+        },
+        Commands::List => {
+            list_available_tools()?;
         }
     }
 

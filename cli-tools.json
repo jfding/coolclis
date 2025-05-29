@@ -1,0 +1,54 @@
+{
+  "tools": [
+    {
+      "name": "ripgrep",
+      "repo": "BurntSushi/ripgrep",
+      "description": "Recursively searches directories for a regex pattern"
+    },
+    {
+      "name": "bat",
+      "repo": "sharkdp/bat",
+      "description": "A cat clone with syntax highlighting and Git integration"
+    },
+    {
+      "name": "fd",
+      "repo": "sharkdp/fd",
+      "description": "A simple, fast and user-friendly alternative to find"
+    },
+    {
+      "name": "exa",
+      "repo": "ogham/exa",
+      "description": "A modern replacement for ls"
+    },
+    {
+      "name": "starship",
+      "repo": "starship/starship",
+      "description": "The minimal, blazing-fast, and infinitely customizable prompt for any shell"
+    },
+    {
+      "name": "delta",
+      "repo": "dandavison/delta",
+      "description": "A viewer for git and diff output"
+    },
+    {
+      "name": "duf",
+      "repo": "muesli/duf",
+      "description": "Disk Usage/Free Utility - a better 'df' alternative"
+    },
+    {
+      "name": "fzf",
+      "repo": "junegunn/fzf",
+      "description": "A command-line fuzzy finder"
+    },
+    {
+      "name": "jq",
+      "repo": "stedolan/jq",
+      "description": "Command-line JSON processor"
+    },
+    {
+      "name": "hyperfine",
+      "repo": "sharkdp/hyperfine",
+      "description": "A command-line benchmarking tool"
+    }
+  ]
+} 
