@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
-use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{self, Cursor};

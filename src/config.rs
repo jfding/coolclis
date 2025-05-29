@@ -51,8 +51,8 @@ pub fn list_available_tools() -> Result<()> {
     let config = load_config_file()?;
     
     println!("Available CLI tools:");
-    println!("{:<15} {:<30} {}", "NAME", "REPOSITORY", "DESCRIPTION");
-    println!("{:<15} {:<30} {}", "----", "----------", "-----------");
+    println!("{:<15} {:<30} DESCRIPTION", "NAME", "REPOSITORY");
+    println!("{:<15} {:<30} -----------", "----", "----------");
     
     for tool in config.tools {
         println!("{:<15} {:<30} {}", tool.name, tool.repo, tool.description);

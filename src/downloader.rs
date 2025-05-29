@@ -52,13 +52,11 @@ impl Downloader {
                                 }
                             }
                         }
+                    } else if attempts < self.max_attempts {
+                        println!("Failed to fetch URL (attempt {}): {}", attempts, response.status());
+                        tokio::time::sleep(Duration::from_secs(self.retry_delay_secs)).await;
                     } else {
-                        if attempts < self.max_attempts {
-                            println!("Failed to fetch URL (attempt {}): {}", attempts, response.status());
-                            tokio::time::sleep(Duration::from_secs(self.retry_delay_secs)).await;
-                        } else {
-                            return Err(anyhow!("Failed to fetch URL: {}", response.status()));
-                        }
+                        return Err(anyhow!("Failed to fetch URL: {}", response.status()));
                     }
                 },
                 Err(e) => {
