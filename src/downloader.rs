@@ -21,7 +21,7 @@ impl Downloader {
             .timeout(Duration::from_secs(timeout_secs))
             .build()
             .expect("Failed to build HTTP client");
-        
+
         Self {
             client,
             max_attempts,
@@ -32,12 +32,12 @@ impl Downloader {
     pub async fn get_json<T: serde::de::DeserializeOwned>(&self, url: &str) -> Result<T> {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT, HeaderValue::from_static("coolclis"));
-        
+
         let mut attempts = 0;
-        
+
         while attempts < self.max_attempts {
             attempts += 1;
-            
+
             match self.client.get(url).headers(headers.clone()).send().await {
                 Ok(response) => {
                     if response.status().is_success() {
@@ -71,7 +71,7 @@ impl Downloader {
                 }
             }
         }
-        
+
         Err(anyhow!("Failed to fetch URL after {} attempts", self.max_attempts))
     }
 
@@ -83,12 +83,12 @@ impl Downloader {
                 .unwrap()
                 .progress_chars("#>-"),
         );
-        
+
         let mut attempts = 0;
-        
+
         while attempts < self.max_attempts {
             attempts += 1;
-            
+
             match self.download_attempt(url, &pb).await {
                 Ok(buffer) => {
                     pb.finish_with_message("Download complete");
@@ -106,30 +106,30 @@ impl Downloader {
                 }
             }
         }
-        
+
         Err(anyhow!("Failed to download file"))
     }
-    
+
     async fn download_attempt(&self, url: &str, pb: &ProgressBar) -> Result<Vec<u8>> {
         let mut response = self.client.get(url)
-            .header(USER_AGENT, "coolclis") 
+            .header(USER_AGENT, "coolclis")
             .send()
             .await
             .context("Failed to send download request")?;
-        
+
         if !response.status().is_success() {
             return Err(anyhow!("Failed to download: HTTP status {}", response.status()));
         }
-        
+
         let mut buffer = Vec::new();
         let mut downloaded: u64 = 0;
-        
+
         while let Some(chunk) = response.chunk().await.context("Failed to download chunk")? {
             downloaded += chunk.len() as u64;
             pb.set_position(downloaded);
             buffer.extend_from_slice(&chunk);
         }
-        
+
         Ok(buffer)
     }
-} 
+}
