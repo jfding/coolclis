@@ -1,0 +1,101 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            name: coolclis-x86_64-linux
+            artifact: coolclis
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            name: coolclis-x86_64-macos
+            artifact: coolclis
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            name: coolclis-aarch64-macos
+            artifact: coolclis
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: coolclis-x86_64-windows
+            artifact: coolclis.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp target/${{ matrix.target }}/release/coolclis.exe dist/
+          else
+            cp target/${{ matrix.target }}/release/coolclis dist/
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create archives
+        run: |
+          mkdir -p dist
+          cd artifacts
+          
+          for dir in */; do
+            dir_name=$(basename "$dir")
+            cd "$dir"
+            
+            if [[ "$dir_name" == *windows* ]]; then
+              zip -r "../../dist/${dir_name}.zip" .
+            else
+              tar czvf "../../dist/${dir_name}.tar.gz" .
+            fi
+            
+            cd ..
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          token: ${{ secrets.RELEASE_TOKEN }}
