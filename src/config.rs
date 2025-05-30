@@ -16,6 +16,8 @@ pub struct CliToolsConfig {
     pub tools: Vec<CliTool>,
 }
 
+const DEFAULT_CONFIG: &str = include_str!("../data/cli-tools.json");
+
 fn load_config_file() -> Result<CliToolsConfig> {
     let config_path = get_config_path()?;
 
@@ -45,25 +47,14 @@ fn get_config_path() -> Result<std::path::PathBuf> {
 
     // If not found in current directory, use the file in .local/share/coolclis/
     let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Failed to determine home directory"))?;
-    let config_base = home_dir.join(".local")
+    let config_path = home_dir.join(".local")
                                        .join("share")
-                                       .join("coolclis");
+                                       .join("coolclis")
+                                       .join("cli-tools.json");
 
-    if !config_base.exists() {
-        fs::create_dir_all(&config_base)?;
-    }
-
-    let config_path = config_base.join("cli-tools.json");
     if !config_path.exists() {
-        // Create the directory if it doesn't exist
-        fs::create_dir_all(&config_base)?;
-
-        // Create the config file if it doesn't exist
-        let default_config = CliToolsConfig {
-            tools: Vec::new(),
-        };
-        let json = serde_json::to_string_pretty(&default_config)?;
-        fs::write(&config_path, json)?;
+        fs::create_dir_all(&config_path.parent().unwrap())?;
+        fs::write(&config_path, DEFAULT_CONFIG)?;
     }
 
     Ok(config_path)
