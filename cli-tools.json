@@ -49,6 +49,11 @@
       "name": "hyperfine",
       "repo": "sharkdp/hyperfine",
       "description": "A command-line benchmarking tool"
+    },
+    {
+      "name": "tokei",
+      "repo": "XAMPPRocky/tokei",
+      "description": "Count lines of code quickly"
     }
   ]
-} 
+}

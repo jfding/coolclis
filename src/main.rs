@@ -9,7 +9,7 @@ mod downloader;
 use downloader::Downloader;
 
 mod config;
-use config::{load_cli_tools, list_available_tools};
+use config::{load_cli_tools, list_available_tools, add_cli_tool};
 
 #[derive(Parser)]
 #[command(name = "coolclis")]
@@ -41,6 +41,19 @@ enum Commands {
 
     /// List all available predefined tools
     List,
+
+    /// Add a new tool to the configuration
+    Add {
+        /// Tool name (used for the executable name and as an identifier)
+        name: String,
+
+        /// GitHub repository in the format owner/repo
+        repo: String,
+
+        /// Description of the tool
+        #[arg(short, long)]
+        description: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -55,19 +68,6 @@ struct Asset {
     browser_download_url: String,
     size: u64,
 }
-
-#[derive(Debug, Deserialize, Serialize)]
-struct CliTool {
-    name: String,
-    repo: String,
-    description: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct CliToolsConfig {
-    tools: Vec<CliTool>,
-}
-
 async fn get_latest_release(repo: &str) -> Result<Release> {
     let downloader = Downloader::default();
     let url = format!("https://api.github.com/repos/{}/releases/latest", repo);
@@ -452,6 +452,17 @@ async fn main() -> Result<()> {
         },
         Commands::List => {
             list_available_tools()?;
+        },
+        Commands::Add { name, repo, description } => {
+            // Validate repository format
+            if !repo.contains('/') || repo.matches('/').count() != 1 {
+                return Err(anyhow!("Repository must be in the format 'owner/repo'"));
+            }
+
+            // Use a default description if none provided
+            let desc = description.as_deref().unwrap_or("No description provided");
+
+            add_cli_tool(name, repo, desc)?;
         }
     }
 
