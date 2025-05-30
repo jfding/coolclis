@@ -17,7 +17,7 @@ pub struct CliToolsConfig {
 }
 
 fn load_config_file() -> Result<CliToolsConfig> {
-    let config_path = Path::new("cli-tools.json");
+    let config_path = get_config_path()?;
 
     // Try to load from the current directory first
     let config_str = match fs::read_to_string(config_path) {
@@ -43,21 +43,30 @@ fn get_config_path() -> Result<std::path::PathBuf> {
         return Ok(config_path.to_path_buf());
     }
 
-    // If not found in current directory, use the file in the executable directory
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().ok_or_else(|| anyhow!("Failed to determine executable directory"))?;
-    let bundled_path = exe_dir.join("cli-tools.json");
+    // If not found in current directory, use the file in .local/share/coolclis/
+    let home_dir = dirs::home_dir().ok_or_else(|| anyhow!("Failed to determine home directory"))?;
+    let config_base = home_dir.join(".local")
+                                       .join("share")
+                                       .join("coolclis");
 
-    if !bundled_path.exists() {
+    if !config_base.exists() {
+        fs::create_dir_all(&config_base)?;
+    }
+
+    let config_path = config_base.join("cli-tools.json");
+    if !config_path.exists() {
+        // Create the directory if it doesn't exist
+        fs::create_dir_all(&config_base)?;
+
         // Create the config file if it doesn't exist
         let default_config = CliToolsConfig {
             tools: Vec::new(),
         };
         let json = serde_json::to_string_pretty(&default_config)?;
-        fs::write(&bundled_path, json)?;
+        fs::write(&config_path, json)?;
     }
 
-    Ok(bundled_path)
+    Ok(config_path)
 }
 
 pub fn add_cli_tool(name: &str, repo: &str, description: &str) -> Result<()> {
