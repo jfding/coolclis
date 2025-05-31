@@ -1,6 +1,11 @@
 {
   "tools": [
     {
+      "name": "todor",
+      "repo": "jfding/todor",
+      "description": "Yet another CLI TODO in Rust."
+    },
+    {
       "name": "ripgrep",
       "repo": "BurntSushi/ripgrep",
       "description": "Recursively searches directories for a regex pattern"
@@ -16,8 +21,8 @@
       "description": "A simple, fast and user-friendly alternative to find"
     },
     {
-      "name": "exa",
-      "repo": "ogham/exa",
+      "name": "eza",
+      "repo": "eza-community/eza",
       "description": "A modern replacement for ls"
     },
     {
@@ -51,9 +56,49 @@
       "description": "A command-line benchmarking tool"
     },
     {
+      "name": "dust",
+      "repo": "bootandy/dust",
+      "description": "A more intuitive version of du in Rust."
+    },
+    {
+      "name": "glow",
+      "repo": "charmbracelet/glow",
+      "description": "Render markdown on the CLI, with pizzazz!"
+    },
+    {
+      "name": "volta",
+      "repo": "volta-cli/volta",
+      "description": "The hassle-free JavaScript tool manager."
+    },
+    {
+      "name": "kondo",
+      "repo": "tbillington/kondo",
+      "description": "Cleans dependencies and build artifacts from your projects."
+    },
+    {
       "name": "tokei",
       "repo": "XAMPPRocky/tokei",
       "description": "Count lines of code quickly"
+    },
+    {
+      "name": "yazi",
+      "repo": "sxyazi/yazi",
+      "description": "A cross-platform file manager written in Rust, using ncurses."
+    },
+    {
+      "name": "zellij",
+      "repo": "zellij-org/zellij",
+      "description": "A terminal workspace with batteries included"
+    },
+    {
+      "name": "zoxide",
+      "repo": "ajeetdsouza/zoxide",
+      "description": "A smarter cd command. Supports all major shells."
+    },
+    {
+      "name": "mihomo",
+      "repo": "MetaCubeX/mihomo",
+      "description": "A rule-based tunnel in Go."
     }
   ]
 }
