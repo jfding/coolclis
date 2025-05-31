@@ -9,7 +9,7 @@ mod downloader;
 use downloader::Downloader;
 
 mod config;
-use config::{load_cli_tools, list_available_tools, add_cli_tool};
+use config::{load_cli_tools, list_available_tools, add_cli_tool, check_cli_tools_links};
 
 #[derive(Parser)]
 #[command(name = "coolclis")]
@@ -54,6 +54,9 @@ enum Commands {
         #[arg(short, long)]
         description: Option<String>,
     },
+
+    /// Check all tool links in the config file (validate GitHub repo exists)
+    Check,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -463,6 +466,18 @@ async fn main() -> Result<()> {
             let desc = description.as_deref().unwrap_or("No description provided");
 
             add_cli_tool(name, repo, desc)?;
+        },
+        Commands::Check => {
+            let results = check_cli_tools_links().await?;
+            println!("{:<15} {:<30} STATUS", "NAME", "REPOSITORY");
+            println!("{:<15} {:<30} ------", "----", "----------");
+            for (name, repo, valid, err) in results {
+                if valid {
+                    println!("{:<15} {:<30} OK", name, repo);
+                } else {
+                    println!("{:<15} {:<30} INVALID: {}", name, repo, err.unwrap_or_else(|| "Unknown error".to_string()));
+                }
+            }
         }
     }
 

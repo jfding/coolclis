@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use reqwest::StatusCode;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CliTool {
@@ -110,4 +111,33 @@ pub fn list_available_tools() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Checks if the GitHub repo for each tool is valid by sending a HEAD request to the releases/latest endpoint.
+pub async fn check_cli_tools_links() -> Result<Vec<(String, String, bool, Option<String>)>> {
+    let config = load_config_file()?;
+    let client = reqwest::Client::new();
+    let mut results = Vec::new();
+
+    for tool in config.tools {
+        let url = format!("https://api.github.com/repos/{}/releases/latest", tool.repo);
+        let res = client
+            .head(&url)
+            .header("User-Agent", "coolclis-check")
+            .send()
+            .await;
+        match res {
+            Ok(resp) => {
+                if resp.status() == StatusCode::OK {
+                    results.push((tool.name, tool.repo, true, None));
+                } else {
+                    results.push((tool.name, tool.repo, false, Some(format!("HTTP {}", resp.status()))));
+                }
+            }
+            Err(e) => {
+                results.push((tool.name, tool.repo, false, Some(e.to_string())));
+            }
+        }
+    }
+    Ok(results)
 }
