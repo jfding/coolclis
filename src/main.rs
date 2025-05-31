@@ -9,7 +9,7 @@ mod downloader;
 use downloader::Downloader;
 
 mod config;
-use config::{load_cli_tools, list_available_tools, add_cli_tool, check_cli_tools_links};
+use config::{load_cli_tools, list_available_tools, add_cli_tool, check_cli_tools_links_streaming};
 
 #[derive(Parser)]
 #[command(name = "coolclis")]
@@ -468,16 +468,7 @@ async fn main() -> Result<()> {
             add_cli_tool(name, repo, desc)?;
         },
         Commands::Check => {
-            let results = check_cli_tools_links().await?;
-            println!("{:<15} {:<30} STATUS", "NAME", "REPOSITORY");
-            println!("{:<15} {:<30} ------", "----", "----------");
-            for (name, repo, valid, err) in results {
-                if valid {
-                    println!("{:<15} {:<30} OK", name, repo);
-                } else {
-                    println!("{:<15} {:<30} INVALID: {}", name, repo, err.unwrap_or_else(|| "Unknown error".to_string()));
-                }
-            }
+            check_cli_tools_links_streaming().await?;
         }
     }
 

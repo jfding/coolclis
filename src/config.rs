@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use reqwest::StatusCode;
+use futures::stream::{FuturesUnordered, StreamExt};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CliTool {
@@ -113,31 +114,46 @@ pub fn list_available_tools() -> Result<()> {
     Ok(())
 }
 
-/// Checks if the GitHub repo for each tool is valid by sending a HEAD request to the releases/latest endpoint.
-pub async fn check_cli_tools_links() -> Result<Vec<(String, String, bool, Option<String>)>> {
+/// Checks if the GitHub repo for each tool is valid by sending a HEAD request to the releases/latest endpoint, in parallel.
+pub async fn check_cli_tools_links_streaming() -> Result<()> {
     let config = load_config_file()?;
     let client = reqwest::Client::new();
-    let mut results = Vec::new();
+    let mut futures = FuturesUnordered::new();
 
     for tool in config.tools {
-        let url = format!("https://api.github.com/repos/{}/releases/latest", tool.repo);
-        let res = client
-            .head(&url)
-            .header("User-Agent", "coolclis-check")
-            .send()
-            .await;
-        match res {
-            Ok(resp) => {
-                if resp.status() == StatusCode::OK {
-                    results.push((tool.name, tool.repo, true, None));
-                } else {
-                    results.push((tool.name, tool.repo, false, Some(format!("HTTP {}", resp.status()))));
+        let client = client.clone();
+        let name = tool.name.clone();
+        let repo = tool.repo.clone();
+        futures.push(async move {
+            let url = format!("https://api.github.com/repos/{}/releases/latest", repo);
+            let res = client
+                .head(&url)
+                .header("User-Agent", "curl")
+                .send()
+                .await;
+            match res {
+                Ok(resp) => {
+                    if resp.status() == StatusCode::OK {
+                        (name, repo, true, None)
+                    } else {
+                        (name, repo, false, Some(format!("HTTP {}", resp.status())))
+                    }
+                }
+                Err(e) => {
+                    (name, repo, false, Some(e.to_string()))
                 }
             }
-            Err(e) => {
-                results.push((tool.name, tool.repo, false, Some(e.to_string())));
-            }
+        });
+    }
+
+    println!("{:<15} {:<30} STATUS", "NAME", "REPOSITORY");
+    println!("{:<15} {:<30} ------", "----", "----------");
+    while let Some((name, repo, valid, err)) = futures.next().await {
+        if valid {
+            println!("{:<15} {:<30} OK", name, repo);
+        } else {
+            println!("{:<15} {:<30} INVALID: {}", name, repo, err.unwrap_or_else(|| "Unknown error".to_string()));
         }
     }
-    Ok(results)
+    Ok(())
 }
