@@ -115,7 +115,11 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
 
     // Variations of OS/arch in filenames
     let os_variations: Vec<&str> = if os == "darwin" {
-        vec!["darwin", "macos", "mac", "osx"]
+        vec!["apple-darwin", "darwin", "macos", "mac", "osx"]
+    } else if os == "windows" {
+        vec!["pc-windows", "windows"]
+    } else if os == "linux" {
+        vec!["unknown-linux", "linux"]
     } else {
         vec![&os]
     };
@@ -135,6 +139,7 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
             search_patterns.push(format!("{}-{}", os_var, arch_var));
             search_patterns.push(format!("{}_{}", os_var, arch_var));
             search_patterns.push(format!("{}{}", os_var, arch_var));
+            search_patterns.push(format!("{}-{}", arch_var, os_var));
         }
         search_patterns.push(os_var.to_string()); // OS only pattern
     }
