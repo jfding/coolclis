@@ -24,11 +24,7 @@ enum Commands {
     /// Install a tool from GitHub
     Install {
         /// GitHub repository in the format owner/repo or a predefined tool name
-        repo: String,
-
-        /// Tool name (used for the executable name)
-        #[arg(short, long)]
-        bin: Option<String>,
+        tool: String,
 
         /// Specific version to install (defaults to latest)
         #[arg(short, long)]
@@ -351,8 +347,8 @@ fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
     }
 }
 
-async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
-    let tool = bin.unwrap_or(repo.split('/').last().unwrap());
+async fn install_tool(repo: &str, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
+    let tool = repo.split('/').next_back().unwrap();
 
     println!("Installing {} from {}", tool, repo);
 
@@ -443,20 +439,20 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Install { repo, bin, version, dir } => {
+        Commands::Install { tool, version, dir } => {
             // Load the tools map
             let tools_map = load_cli_tools()?;
 
             // Check if the repo is a known tool name
-            let actual_repo = if repo.contains('/') {
-                repo.to_string()
+            let actual_repo = if tool.contains('/') {
+                tool.to_string()
             } else {
-                tools_map.get(repo)
-                    .ok_or_else(|| anyhow!("Unknown tool: {}. Use the 'list' command to see available tools.", repo))?
+                tools_map.get(tool)
+                    .ok_or_else(|| anyhow!("Unknown tool: {}. Use the 'list' command to see available tools.", tool))?
                     .to_string()
             };
 
-            install_tool(&actual_repo, bin.as_deref(), version.as_deref(), dir.as_ref()).await?;
+            install_tool(&actual_repo, version.as_deref(), dir.as_ref()).await?;
         },
         Commands::List => {
             list_available_tools()?;

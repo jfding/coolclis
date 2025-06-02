@@ -55,7 +55,7 @@ fn get_config_path() -> Result<std::path::PathBuf> {
                                        .join("cli-tools.json");
 
     if !config_path.exists() {
-        fs::create_dir_all(&config_path.parent().unwrap())?;
+        fs::create_dir_all(config_path.parent().unwrap())?;
         fs::write(&config_path, DEFAULT_CONFIG)?;
     }
 
