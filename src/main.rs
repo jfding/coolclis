@@ -40,11 +40,12 @@ enum Commands {
 
     /// Add a new tool to the configuration
     Add {
-        /// Tool name (used for the executable name and as an identifier)
-        name: String,
-
         /// GitHub repository in the format owner/repo
         repo: String,
+
+        /// Tool name (used for the executable name and as an identifier, defaults to extract from the repo name)
+        #[arg(short, long)]
+        name: Option<String>,
 
         /// Description of the tool
         #[arg(short, long)]
@@ -457,16 +458,19 @@ async fn main() -> Result<()> {
         Commands::List => {
             list_available_tools()?;
         },
-        Commands::Add { name, repo, description } => {
+        Commands::Add { repo, name, description } => {
             // Validate repository format
             if !repo.contains('/') || repo.matches('/').count() != 1 {
                 return Err(anyhow!("Repository must be in the format 'owner/repo'"));
             }
 
+            // Use a default name if none provided
+            let tool = name.as_deref().unwrap_or(repo.split('/').next_back().unwrap());
+
             // Use a default description if none provided
             let desc = description.as_deref().unwrap_or("No description provided");
 
-            add_cli_tool(name, repo, desc)?;
+            add_cli_tool(tool, repo, desc)?;
         },
         Commands::Check => {
             check_cli_tools_links_streaming().await?;
