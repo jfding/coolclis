@@ -103,7 +103,7 @@ pub fn load_cli_tools() -> Result<HashMap<String, String>> {
 pub fn list_available_tools() -> Result<()> {
     let config = load_config_file()?;
 
-    println!("Available CLI tools:");
+    println!("Available CLI tools: (predefined in {})", get_config_path()?.display());
     println!("{:<15} {:<30} DESCRIPTION", "NAME", "REPOSITORY");
     println!("{:<15} {:<30} -----------", "----", "----------");
 
