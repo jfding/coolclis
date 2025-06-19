@@ -9,7 +9,7 @@ mod downloader;
 use downloader::Downloader;
 
 mod config;
-use config::{load_cli_tools, list_available_tools, add_cli_tool};
+use config::{load_cli_tools, list_available_tools, add_cli_tool, check_cli_tools_links_streaming};
 
 mod unpack;
 use unpack::extract_archive;
@@ -27,11 +27,7 @@ enum Commands {
     /// Install a tool from GitHub
     Install {
         /// GitHub repository in the format owner/repo or a predefined tool name
-        repo: String,
-
-        /// Tool name (used for the executable name)
-        #[arg(short, long)]
-        bin: Option<String>,
+        tool: String,
 
         /// Specific version to install (defaults to latest)
         #[arg(short, long)]
@@ -47,16 +43,20 @@ enum Commands {
 
     /// Add a new tool to the configuration
     Add {
-        /// Tool name (used for the executable name and as an identifier)
-        name: String,
-
         /// GitHub repository in the format owner/repo
         repo: String,
+
+        /// Tool name (used for the executable name and as an identifier, defaults to extract from the repo name)
+        #[arg(short, long)]
+        name: Option<String>,
 
         /// Description of the tool
         #[arg(short, long)]
         description: Option<String>,
     },
+
+    /// Check all tool links in the config file (validate GitHub repo exists)
+    Check,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -115,7 +115,11 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
 
     // Variations of OS/arch in filenames
     let os_variations: Vec<&str> = if os == "darwin" {
-        vec!["darwin", "macos", "mac", "osx"]
+        vec!["apple-darwin", "darwin", "macos", "mac", "osx"]
+    } else if os == "windows" {
+        vec!["pc-windows", "windows"]
+    } else if os == "linux" {
+        vec!["unknown-linux", "linux"]
     } else {
         vec![&os]
     };
@@ -135,6 +139,7 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
             search_patterns.push(format!("{}-{}", os_var, arch_var));
             search_patterns.push(format!("{}_{}", os_var, arch_var));
             search_patterns.push(format!("{}{}", os_var, arch_var));
+            search_patterns.push(format!("{}-{}", arch_var, os_var));
         }
         search_patterns.push(os_var.to_string()); // OS only pattern
     }
@@ -175,8 +180,8 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
     Err(anyhow!("No suitable asset found for your platform ({}-{})", os, arch))
 }
 
-async fn install_tool(repo: &str, bin: Option<&str>, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
-    let tool = bin.unwrap_or(repo.split('/').last().unwrap());
+async fn install_tool(repo: &str, version: Option<&str>, dir: Option<&PathBuf>) -> Result<()> {
+    let tool = repo.split('/').next_back().unwrap();
 
     println!("Installing {} from {}", tool, repo);
 
@@ -267,34 +272,40 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Install { repo, bin, version, dir } => {
+        Commands::Install { tool, version, dir } => {
             // Load the tools map
             let tools_map = load_cli_tools()?;
 
             // Check if the repo is a known tool name
-            let actual_repo = if repo.contains('/') {
-                repo.to_string()
+            let actual_repo = if tool.contains('/') {
+                tool.to_string()
             } else {
-                tools_map.get(repo)
-                    .ok_or_else(|| anyhow!("Unknown tool: {}. Use the 'list' command to see available tools.", repo))?
+                tools_map.get(tool)
+                    .ok_or_else(|| anyhow!("Unknown tool: {}. Use the 'list' command to see available tools.", tool))?
                     .to_string()
             };
 
-            install_tool(&actual_repo, bin.as_deref(), version.as_deref(), dir.as_ref()).await?;
+            install_tool(&actual_repo, version.as_deref(), dir.as_ref()).await?;
         },
         Commands::List => {
             list_available_tools()?;
         },
-        Commands::Add { name, repo, description } => {
+        Commands::Add { repo, name, description } => {
             // Validate repository format
             if !repo.contains('/') || repo.matches('/').count() != 1 {
                 return Err(anyhow!("Repository must be in the format 'owner/repo'"));
             }
 
+            // Use a default name if none provided
+            let tool = name.as_deref().unwrap_or(repo.split('/').next_back().unwrap());
+
             // Use a default description if none provided
             let desc = description.as_deref().unwrap_or("No description provided");
 
-            add_cli_tool(name, repo, desc)?;
+            add_cli_tool(tool, repo, desc)?;
+        },
+        Commands::Check => {
+            check_cli_tools_links_streaming().await?;
         }
     }
 
