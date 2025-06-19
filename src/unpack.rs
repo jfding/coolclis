@@ -28,50 +28,61 @@ pub fn extract_archive(data: &[u8], filename: &str, dest_dir: &Path) -> Result<O
 
 /// Find an executable file within a directory structure
 pub fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
-    // First, try to find a file with the same name as the last directory component
-    if let Some(dir_name) = dir.file_name().and_then(|n| n.to_str()) {
-        // Check if there's a bin directory with the executable
-        let bin_dir = dir.join("bin");
-        if bin_dir.exists() && bin_dir.is_dir() {
-            for entry in fs::read_dir(&bin_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_file() {
-                    // If we find the expected tool name in bin/, prioritize it
-                    if path.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s == dir_name || s.starts_with(dir_name))
-                        .unwrap_or(false)
-                    {
-                        make_executable(&path)?;
-                        return Ok(Some(path));
-                    }
-                }
-            }
+    let exe_name = dir.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .strip_suffix("_temp")
+        .unwrap_or("");
 
-            // If we didn't find an exact match, return the first file in bin/
-            for entry in fs::read_dir(&bin_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-                if path.is_file() {
+    // First, check if there's a bin directory with the executable
+    let bin_dir = dir.join("bin");
+    if bin_dir.exists() && bin_dir.is_dir() {
+        for entry in fs::read_dir(&bin_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                // If we find the expected tool name in bin/, prioritize it
+                if path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s == exe_name || s.starts_with(exe_name))
+                    .unwrap_or(false)
+                {
                     make_executable(&path)?;
                     return Ok(Some(path));
                 }
             }
         }
 
-        // Next, try to find a file with the same name as the directory
-        let possible_bin = dir.join(dir_name);
-        if possible_bin.exists() && possible_bin.is_file() {
-            make_executable(&possible_bin)?;
-            return Ok(Some(possible_bin));
+        // If we didn't find an exact match, return the first file in bin/
+        for entry in fs::read_dir(&bin_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                make_executable(&path)?;
+                return Ok(Some(path));
+            }
         }
     }
 
-    // Check for common executable names and locations
+    // Next, try to find a file with the same name as the directory
+    let possible_bin = dir.join(exe_name);
+    if possible_bin.exists() && possible_bin.is_file() {
+        make_executable(&possible_bin)?;
+        return Ok(Some(possible_bin));
+    }
+
+    // Last, check for common executable names and locations
     let mut candidates = Vec::new();
 
     search_directory(dir, &mut candidates)?;
+
+    // get the one with exe_name as the file name
+    if let Some(exe_candidate) = candidates.iter()
+        .find(|c| c.file_name().and_then(|n| n.to_str()).unwrap_or("") == exe_name) {
+
+        make_executable(exe_candidate)?;
+        return Ok(Some(exe_candidate.clone()));
+    }
 
     // Sort candidates to prioritize likely executables
     candidates.sort_by(|a, b| {
@@ -92,7 +103,7 @@ pub fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
         }
     });
 
-    // Take the first candidate
+    // Take the first candidate after sorting, as the last fallback
     if let Some(path) = candidates.first() {
         make_executable(path)?;
         Ok(Some(path.clone()))
