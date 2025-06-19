@@ -2,9 +2,6 @@ use anyhow::Result;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use flate2;
-use tar;
-use zip;
 
 /// Extract an archive and find the executable within it
 pub fn extract_archive(data: &[u8], filename: &str, dest_dir: &Path) -> Result<Option<PathBuf>> {
@@ -74,52 +71,6 @@ pub fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
     // Check for common executable names and locations
     let mut candidates = Vec::new();
 
-    fn search_directory(dir: &Path, candidates: &mut Vec<PathBuf>) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-
-            if path.is_file() {
-                let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-
-                // Skip files that start with a dot or are LICENSE or README files
-                if !file_name.starts_with('.') &&
-                   !file_name.starts_with("LICENSE") &&
-                   !file_name.starts_with("README") &&
-                   !file_name.contains(".md") &&
-                   !file_name.contains(".txt") {
-
-                    // Prioritize files without extensions
-                    if !file_name.contains('.') {
-                        candidates.push(path.clone());
-                    } else {
-                        candidates.push(path);
-                    }
-                }
-            } else if path.is_dir() {
-                // Skip directories that start with a dot
-                if path.file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|s| !s.starts_with('.'))
-                    .unwrap_or(false)
-                {
-                    // Check if this is a bin directory
-                    if path.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|s| s == "bin")
-                        .unwrap_or(false)
-                    {
-                        // Prioritize searching bin directories
-                        search_directory(&path, candidates)?;
-                    } else {
-                        search_directory(&path, candidates)?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     search_directory(dir, &mut candidates)?;
 
     // Sort candidates to prioritize likely executables
@@ -148,6 +99,52 @@ pub fn find_executable_recursively(dir: &Path) -> Result<Option<PathBuf>> {
     } else {
         Ok(None)
     }
+}
+
+fn search_directory(dir: &Path, candidates: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_file() {
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+            // Skip files that start with a dot or are LICENSE or README files
+            if !file_name.starts_with('.') &&
+                !file_name.starts_with("LICENSE") &&
+                !file_name.starts_with("README") &&
+                !file_name.contains(".md") &&
+                !file_name.contains(".txt") {
+
+                // Prioritize files without extensions
+                if !file_name.contains('.') {
+                    candidates.push(path.clone());
+                } else {
+                    candidates.push(path);
+                }
+            }
+        } else if path.is_dir() {
+            // Skip directories that start with a dot
+            if path.file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| !s.starts_with('.'))
+                .unwrap_or(false)
+            {
+                // Check if this is a bin directory
+                if path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|s| s == "bin")
+                    .unwrap_or(false)
+                {
+                    // Prioritize searching bin directories
+                    search_directory(&path, candidates)?;
+                } else {
+                    search_directory(&path, candidates)?;
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Make a file executable on Unix systems
