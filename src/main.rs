@@ -119,7 +119,8 @@ fn find_appropriate_asset<'a>(release: &'a Release, tool_name: &str) -> Result<&
     } else if os == "windows" {
         vec!["pc-windows", "windows"]
     } else if os == "linux" {
-        vec!["unknown-linux", "linux"]
+        // prefer musl over gnu
+        vec!["unknown-linux-musl", "unknown-linux", "unknown-linux-gnu", "linux"]
     } else {
         vec![&os]
     };
